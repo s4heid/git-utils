@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+
+set -e
+
+remove-old-key() {
+  /usr/bin/ssh-add -D
+}
+
+add-new-key() {
+  if [[ "$EOD" == true && -n "$HOURS" ]]; then
+    echo "cannot specify both, hours and end of the day" 1>&2
+    exit 1
+  fi
+
+  (( CURRENT_TIME=$(date -j -f "%a %b %d %T %Z %Y" "`date`" "+%s") ))
+  (( DELETE_TIME=$(date -j -f "%a %b %d %T %Z %Y" "`date | \
+    sed -E "s/[0-9]+\\:[0-9]+\\:[0-9]+/18:00:00/"`" "+%s") ))
+
+  # TODO: make ssh key directory configurable in config file
+  if [ -z "$KEY_PATH" ]; then
+    KEY_PATH="$( dirname "$0" )/id_rsa"
+  fi
+
+  if [ $EOD == true ]; then
+    (( DELTA=DELETE_TIME-CURRENT_TIME ))
+    /usr/bin/ssh-add -t "$DELTA" "$KEY_PATH"
+    return
+  fi
+
+  if [ -z "$HOURS" ]; then
+    HOURS=1
+  fi
+
+  /usr/bin/ssh-add -t "${HOURS}H" "$KEY_PATH"
+}
+
+add-token() {
+  git credential-cache exit
+  git config --system --unset credential.helper || true
+  git config --global credential.helper "cache --timeout=$(( 60*60*HOURS ))"
+
+  # this is a hack, because there seems no simple way to tell the
+  # credential-cache of git a password manually.
+  token=$(mktemp token.XXXXXX); trap 'rm $token' 0 2 3 15
+  cat > "$token" <<EOF
+#!/bin/sh
+exec echo "$c_git_token"
+EOF
+  chmod +x $token
+  export GIT_ASKPASS="./$token"
+  rm -rf /tmp/clone-helper && \
+    git clone -q -n "$c_git_repository" /tmp/clone-helper
+}
+
+usage() {
+  echo
+  echo "Usage: load-keys [[--eod] | [-t | --hours] | [-d | --dir] | [-h | --help]]"
+  echo
+  echo "Remove all added identities and add a new identity with a lifetime"
+  echo
+  echo "Options:"
+  echo "  -t  --hours               Number of hours the ssh key should be loaded (Default 1 hour)"
+  echo "      --eod                 Loads the private key until the end of the day (6 p.m.)"
+  echo "  -d  --dir                 Path where ssh keys are located. Default assumes that the private key is"
+  echo "                            in the same directory as the load script and is named \'id_rsa\'"
+  echo "  -h, --help                Show this help message"
+}
+
+parse_yaml() {
+   local prefix=$2
+   local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
+   sed -ne "s|^\($s\)\($w\)$s:$s\"\(.*\)\"$s\$|\1$fs\2$fs\3|p" \
+        -e "s|^\($s\)\($w\)$s:$s\(.*\)$s\$|\1$fs\2$fs\3|p"  $1 |
+   awk -F$fs '{
+      indent = length($1)/2;
+      vname[indent] = $2;
+      for (i in vname) {if (i > indent) {delete vname[i]}}
+      if (length($3) > 0) {
+         vn=""; for (i=0; i<indent; i++) {vn=(vn)(vname[i])("_")}
+         printf("%s%s%s=\"%s\"\n", "'$prefix'",vn, $2, $3);
+      }
+   }'
+}
+
+main() {
+  HOURS=
+  KEY_PATH=
+  EOD=false
+
+  if [ -z "$1" ]; then
+    usage
+    exit 0
+  fi
+
+  while (( $# > 0 )); do
+    case $1 in
+      --eod )        EOD=true
+                     ;;
+      -t | --hours ) shift
+                     HOURS=$1
+                     ;;
+      -d | --dir )   shift
+                     KEY_PATH=$1
+                     ;;
+      -h | --help )  usage
+                     exit
+                     ;;
+      * )            usage
+                     echo "load-keys: illegal option -- $1" 1>&2
+                     exit 1
+    esac
+    shift
+  done
+
+  eval $(parse_yaml "$(dirname "$0")"/config.yml "c_")
+
+  remove-old-key
+  add-new-key
+
+  if [ -n "$c_git_token" ]; then
+    add-token
+  fi
+
+  if [ -n "$c_git_username" ]; then
+    git config --global credential.username "$c_git_username"
+  fi
+
+  if [ "$c_print_enabled" = "true" ]; then
+    (
+      cd "$(dirname "$0")" >/dev/null 2>&1 && \
+        cat "$c_print_filepath"
+    )
+  fi
+
+  /usr/sbin/diskutil umount force "$( dirname "$0")"
+}
+
+main "$@"
