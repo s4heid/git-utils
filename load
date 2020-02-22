@@ -12,18 +12,17 @@ add-new-key() {
     exit 1
   fi
 
-  (( CURRENT_TIME=$(date -j -f "%a %b %d %T %Z %Y" "`date`" "+%s") ))
-  (( DELETE_TIME=$(date -j -f "%a %b %d %T %Z %Y" "`date | \
-    sed -E "s/[0-9]+\\:[0-9]+\\:[0-9]+/18:00:00/"`" "+%s") ))
-
-  # TODO: make ssh key directory configurable in config file
   if [ -z "$KEY_PATH" ]; then
-    KEY_PATH="$( dirname "$0" )/id_rsa"
+    default_path="$( dirname "$0" )/id_rsa"
+    KEY_PATH="${c_key:-$default_path}"
   fi
 
   if [ $EOD == true ]; then
-    (( DELTA=DELETE_TIME-CURRENT_TIME ))
-    /usr/bin/ssh-add -t "$DELTA" "$KEY_PATH"
+    (( current_time=$(date -j -f "%a %b %d %T %Z %Y" "`date`" "+%s") ))
+    (( delete_time=$(date -j -f "%a %b %d %T %Z %Y" "`date | \
+      sed -E "s/[0-9]+\\:[0-9]+\\:[0-9]+/18:00:00/"`" "+%s") ))
+    (( delta=delete_time-current_time ))
+    /usr/bin/ssh-add -t "$delta" "$KEY_PATH"
     return
   fi
 
@@ -39,17 +38,11 @@ add-token() {
   git config --system --unset credential.helper || true
   git config --global credential.helper "cache --timeout=$(( 60*60*HOURS ))"
 
-  # this is a hack, because there seems no simple way to tell the
-  # credential-cache of git a password manually.
-  token=$(mktemp token.XXXXXX); trap 'rm $token' 0 2 3 15
-  cat > "$token" <<EOF
-#!/bin/sh
-exec echo "$c_git_token"
-EOF
-  chmod +x $token
-  export GIT_ASKPASS="./$token"
-  rm -rf /tmp/clone-helper && \
-    git clone -q -n "$c_git_repository" /tmp/clone-helper
+  (
+    echo "username=$c_git_username"
+    echo "password=$c_git_token"
+    echo ""
+  ) | git credential approve
 }
 
 usage() {
@@ -67,6 +60,7 @@ usage() {
 }
 
 parse_yaml() {
+   # https://gist.github.com/pkuczynski/8665367
    local prefix=$2
    local s='[[:space:]]*' w='[a-zA-Z0-9_]*' fs=$(echo @|tr @ '\034')
    sed -ne "s|^\($s\)\($w\)$s:$s\"\(.*\)\"$s\$|\1$fs\2$fs\3|p" \
@@ -86,6 +80,11 @@ main() {
   HOURS=
   KEY_PATH=
   EOD=false
+
+  if [ "$(uname)" != "Darwin" ]; then
+    >&2 echo "Your platform ($(uname -a)) is currently not supported."
+    exit 1
+  fi
 
   if [ -z "$1" ]; then
     usage
@@ -125,10 +124,10 @@ main() {
     git config --global credential.username "$c_git_username"
   fi
 
-  if [ "$c_print_enabled" = "true" ]; then
+  if [ -f "$c_ascii" ]; then
     (
       cd "$(dirname "$0")" >/dev/null 2>&1 && \
-        cat "$c_print_filepath"
+        cat "$c_ascii"
     )
   fi
 
