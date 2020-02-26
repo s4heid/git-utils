@@ -13,8 +13,8 @@ add-new-key() {
   fi
 
   if [ -z "$KEY_PATH" ]; then
-    default_path="$( dirname "$0" )/id_rsa"
-    KEY_PATH="${c_key:-$default_path}"
+    default_path="id_rsa"
+    KEY_PATH="$( dirname "$0" )/${c_git_key:-$default_path}"
   fi
 
   if [ $EOD == true ]; then
@@ -39,6 +39,7 @@ add-token() {
   git config --global credential.helper "cache --timeout=$(( 60*60*HOURS ))"
 
   (
+    echo "host=${c_git_host:-"github.com"}"
     echo "username=$c_git_username"
     echo "password=$c_git_token"
     echo ""
@@ -124,14 +125,14 @@ main() {
     git config --global credential.username "$c_git_username"
   fi
 
-  if [ -f "$c_ascii" ]; then
+  if [ -n "$c_ascii" ]; then
     (
-      cd "$(dirname "$0")" >/dev/null 2>&1 && \
-        cat "$c_ascii"
+      cd "$(dirname "$0")" >/dev/null 2>&1
+      cat "$c_ascii" || true
     )
   fi
 
-  /usr/sbin/diskutil umount force "$( dirname "$0")"
+  /usr/sbin/diskutil umount force "$( dirname "$0")/.."
 }
 
 main "$@"

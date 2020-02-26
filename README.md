@@ -16,22 +16,26 @@ This tool is intended to be used with an USB device on macOS. Other platforms ar
 You also might want to create a wrapper script in the root of your USB device, e.g.
 
 ```console
-$ cat > ../load <<EOF
+$ cat > ./load <<EOF
 #!/bin/bash
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-exec ./git-utils/load
+exec ./git-utils/load "$@"
 EOF
-$ chmod +x ../load
+$ chmod +x ./load
 ```
 
 ## Configuration
 
+The load script expects a configuration file `config.yml`, which is located in
+the git-utils repository.
+
 | Parameter         | Required | Example                      | Description                                                |
 | ----------------- | -------- | ---------------------------- | ---------------------------------------------------------- |
-| `git.username`    | No       | s4heid                       | The username which will be set for the [git credential context](https://git-scm.com/docs/gitcredentials#Documentation/gitcredentials.txt-username). |
-| `git.key`         | No       | ./id_rsa                     | The path to the private ssh key relative to the load script. Default: ./id_rsa |
-| `git.token`       | No       | 123456789abcdefghijkl        | The git password, which will be stored in the [git-credential-cache](https://git-scm.com/docs/git-credential-cache). |
-| `ascii`           | No       | ./ascii.txt                  | The path to a text file which will be printed after loading the keys/tokens. Time to show off your [ascii art](https://en.wikipedia.org/wiki/ASCII_art) collection. |
+| `git.username`    | No       | `s4heid`                     | The username which will be set for the [git credential context](https://git-scm.com/docs/gitcredentials#Documentation/gitcredentials.txt-username). |
+| `git.key`         | No       | `../id_rsa`                  | The path to the private ssh key relative to the load script. Default: ./id_rsa |
+| `git.token`       | No       | `123456789abcdefghijkl`      | The git password which will be stored in the [git-credential-cache](https://git-scm.com/docs/git-credential-cache). |
+| `git.host`        | No       | `mygithost`                  | The host which will be used for a specific git credential. Default: `github.com` |
+| `ascii`           | No       | `./ascii.txt`                | The path to a text file which will be printed after loading the keys/tokens. Time to show off your [ascii art](https://en.wikipedia.org/wiki/ASCII_art) collection. |
 
 ### Example
 
