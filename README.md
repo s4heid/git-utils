@@ -7,6 +7,7 @@ Some utils for loading and creating ssh keys and tokens for authentication with 
 This tool is intended to be used with an USB device on macOS. Other platforms are currently not supported.
 
 1. Clone the repository
+
   ```console
   $ git clone git@github.com:s4heid/git-utils.git
   ```
@@ -52,18 +53,19 @@ ascii: ./ascii.txt
 Insert your USB device and execute the load script and specify the time how long your keys should be loaded. See the help for more information about the usage:
 
 ```console
-$ /Volumes/keys/load
+$ /Volumes/keys/load --help
 
-Usage: load-keys [[--eod] | [-t | --hours] | [-d | --dir] | [-h | --help]]
+Usage: load-keys
 
 Remove all added identities and add a new identity with a lifetime
 
 Options:
-  -t  --hours               Number of hours the ssh key should be loaded (Default 1 hour)
-      --eod                 Loads the private key until the end of the day (6 p.m.)
-  -d  --dir                 Path where ssh keys are located. Default assumes that the private key is
-                            in the same directory as the load script and is named \'id_rsa\'
-  -h, --help                Show this help message
+  -d | --dir=DIRECTORY     Filepath to keys. (default: same directory as load script)
+  -t | --hours=DURATION    How many hours the key should be loaded (default: 1 hour)
+       --eod               Load the private key until the end of the day (6 p.m.)
+       --no-eject          Do not eject the usb device
+
+  -h | --help              Show this help message
 ```
 
 For security reasons, you might want to encrypt your USB device. Instructions can be found in this [excellent blog](http://tammersaleh.com/posts/building-an-encrypted-usb-drive-for-your-ssh-keys-in-os-x/).

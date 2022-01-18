@@ -42,22 +42,24 @@ add-token() {
     echo "host=${c_git_host:-"github.com"}"
     echo "username=$c_git_username"
     echo "password=$c_git_token"
+    echo "protocol=https"
     echo ""
   ) | git credential approve
 }
 
 usage() {
   echo
-  echo "Usage: load-keys [[--eod] | [-t | --hours] | [-d | --dir] | [-h | --help]]"
+  echo "Usage: load-keys"
   echo
   echo "Remove all added identities and add a new identity with a lifetime"
   echo
   echo "Options:"
-  echo "  -t  --hours               Number of hours the ssh key should be loaded (Default 1 hour)"
-  echo "      --eod                 Loads the private key until the end of the day (6 p.m.)"
-  echo "  -d  --dir                 Path where ssh keys are located. Default assumes that the private key is"
-  echo "                            in the same directory as the load script and is named \'id_rsa\'"
-  echo "  -h, --help                Show this help message"
+  echo "  -d | --dir=DIRECTORY     Filepath to keys. (default: same directory as load script)"
+  echo "  -t | --hours=DURATION    How many hours the key should be loaded (default: 1 hour)"
+  echo "       --eod               Load the private key until the end of the day (6 p.m.)"
+  echo "       --no-eject          Do not eject the usb device"
+  echo
+  echo "  -h | --help              Show this help message"
 }
 
 parse_yaml() {
@@ -81,20 +83,18 @@ main() {
   HOURS=
   KEY_PATH=
   EOD=false
+  EJECT=true
 
   if [ "$(uname)" != "Darwin" ]; then
     >&2 echo "Your platform ($(uname -a)) is currently not supported."
     exit 1
   fi
 
-  if [ -z "$1" ]; then
-    usage
-    exit 0
-  fi
-
   while (( $# > 0 )); do
     case $1 in
       --eod )        EOD=true
+                     ;;
+      --no-eject )   EJECT=false
                      ;;
       -t | --hours ) shift
                      HOURS=$1
@@ -132,7 +132,9 @@ main() {
     )
   fi
 
-  /usr/sbin/diskutil umount force "$( dirname "$0")/.."
+  if [ $EJECT == true ]; then
+    /usr/sbin/diskutil umount force "$( dirname "$0")/.."
+  fi
 }
 
 main "$@"
